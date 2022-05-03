@@ -1,4 +1,5 @@
 from cmath import inf
+import copy
 from random import randint
 
 
@@ -21,60 +22,136 @@ class Player:
         self.cutoff_depth = 3
 
 
-    def _get_eval_score(s):
+    def _get_eval_score(self, s):
         # Capturing opponent's pieces gets positive score
 
         # Forming a chain get a positive score
 
-        # Getting closer to the opposit side gets a positive score
+        # Getting closer to the opposite side gets a positive score
 
         # each turn taken incur a -1 penalty
-        return 0
+        return randint(1,10)
 
-    def _get_actions(s):
+    def _get_actions(self, s):
         """
         Get all possible actions at the current state
         """
-        pass
+        # action = ("PLACE", r, q)
+        actions = []
+        for i in range(self.n):
+            for j in range(self.n):
+                if (self.internal_board[i][j] != "blue" and self.internal_board[i][j] != "red"):
+                    actions.append(("PLACE", i, j))
+        # need to add aciton for steal??
+        if (self.is_first_turn and self.colour == "blue"):
+            actions.append(("STEAL", ))
 
-    def _max_value(self, s):
+        return actions
+
+    def _max_value(self, s, a):
         """
         Player's turn
         Get the maximum of the minimum values
         """
 
-        # s = (self.internal_board, depth)
+        # s = [self.internal_board, depth]
+        s[1] += 1
         if (s[1] == self.cutoff_depth):
-            return _get_eval_score(s)
+            return self._get_eval_score(s)
 
         v = -inf
-        for a in _get_actions(s):
-            v = max(v, _min_value(result(s, a)))
+        for a in self._get_actions(s):
+            v = max(v, self._min_value([self.result(s, a), s[1]], a))
         return v
 
-    def result(s, a):
+    def result(self, s, a):
         """
         s: is the current internal board state
         a: the action we want to apply to the state
 
         return updated state with action a.
         """
-        pass
+        new_state = copy.deepcopy(s[0])
 
-    def _min_value(self, s):
+        if (a[0] == "PLACE"):
+            new_state[a[1]][a[2]] = self.colour
+            # implement capture rule
+        elif (a[0] == "STEAL"):
+            # TODO: CHECK THIS
+            new_state[self.a[1]][a[2]] = 0
+            if (self.colour == "blue"):
+                new_state[a[2]][a[1]] = "blue"
+            else:
+                new_state[a[2]][a[1]] = "red"
+        # ANOTHER CASE: capture rule
+
+        return new_state
+
+
+
+    def _min_value(self, s, a):
         """
         Opponent's turn
         Get the minimum of the maximum's value
         """
-        # s = ("PLACE", r, q, depth)
-        if (s[3] == self.cutoff_depth):
-            return _get_eval_score(s)
-
+        # s = [self.internal_board, depth]
+        s[1] = s[1] + 1
+        if (s[1] == self.cutoff_depth and (not self._is_terminal(s, a))):
+            return self._get_eval_score(s)
 
         v = inf
-        for a in _get_actions(s):
-            v = min(v, _min_value(result(s, a)))
+        for a in self._get_actions(s):
+            v = min(v, self._max_value([self.result(s, a), s[1]], a))
         return v
+
+    def _is_terminal(self, s, a):
+        # s = [self.internal_board, depth]
+        # action = ("PLACE", r, q)
+        
+        if self.colour == "red": # red: start is bottom row, goal is top
+            starts = [(0,i) for i in range(self.n)]
+            goals = [(self.n-1,i) for i in range(self.n)]
+        else: # blue: start is left column, goal is right
+            starts = [(i,0) for i in range(self.n)]
+            goals = [(i,self.n-1) for i in range(self.n)]
+
+        # for i in range(self.n):
+        #     for j in starts:
+        #         node = starts[j]
+        #         if self.internal_board[node[0], node[1]] == self.colour:
+        #             if (self.bfs(node[0], node[1], goals)):
+        #                 return True
+        for i in range(self.n):
+            node = starts[i]
+            if self.internal_board[node[0]][node[1]] == self.colour:
+                if (self.bfs(node[0], node[1], goals)):
+                    return True
+        return False
+
+
+    def bfs(self, r, q, goals):
+        visited = [(r,q)]
+        queue = [(r,q)]
+        while (queue != []):
+            curr = queue.pop(0)
+            if curr in goals:
+                return True
+            for neighbour in self.get_neighbours(curr[0], curr[1]):
+                if neighbour not in visited:
+                    queue.append(neighbour)
+                    visited.append(neighbour)
+        return False
+
+
+    def get_neighbours(self, r, q):
+        firsts = [r+1, r-1, r, r, r+1, r-1]
+        seconds = [q, q, q+1, q-1, q-1, q+1]
+        neighbours = []
+        for i in range(len(firsts)):
+            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and self.internal_board[firsts[i]][seconds[i]] == self.colour):
+                neighbours.append((firsts[i], seconds[i]))
+        return neighbours
+
 
     def action(self):
         """
@@ -83,16 +160,15 @@ class Player:
         """
         # put your code here
         # Return The Max value among all minimised value
-
         
         depth = 0
-        s = (self.internal_board, depth)
-        actions = _get_actions(s)
-        values = [_get_eval_score(result(s,a)) for a in actions]
+        s = [self.internal_board, depth]
+        actions = self._get_actions(s)
+        values = [self._min_value([self.result(s,a), s[1]], a) for a in actions]
         
         max_value = max(values)
         action = actions[values.index(max_value)]
-            
+        
         # r = randint(0,self.n-1)
         # q = randint(0,self.n-1)
         # action = ("PLACE", r, q)
@@ -117,11 +193,14 @@ class Player:
         # put your code here
         if (self.last_action[0] == "PLACE"):
             self.internal_board[self.last_action[1]][self.last_action[2]] = player
-        else:
+            # implement capture rule
+        elif (self.last_action[0] == "STEAL"):
+            self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
             if (player == "blue"):
-                self.internal_board[self.first_turn[1]][self.first_turn[2]] = "red"
+                self.internal_board[self.first_turn[2]][self.first_turn[1]] = "blue"
             else:
-                self.internal_board[self.first_turn[1]][self.first_turn[2]] = "blue"
+                self.internal_board[self.first_turn[2]][self.first_turn[1]] = "red"
+        # ANOTHER CASE: capture rule
 
         print("BOARD: ", self.internal_board)
 
