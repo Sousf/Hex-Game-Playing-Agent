@@ -1,6 +1,18 @@
 from cmath import inf
 import copy
 from random import randint
+from numpy import zeros, array, roll, vectorize
+
+
+
+# borrowed from referee
+_ADD = lambda a, b: (a[0] + b[0], a[1] + b[1])
+_HEX_STEPS = array([(1, -1), (1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1)], 
+    dtype="i,i")
+_CAPTURE_PATTERNS = [[_ADD(n1, n2), n1, n2] 
+    for n1, n2 in 
+        list(zip(_HEX_STEPS, roll(_HEX_STEPS, 1))) + 
+        list(zip(_HEX_STEPS, roll(_HEX_STEPS, 2)))]
 
 
 class Player:
@@ -75,7 +87,7 @@ class Player:
 
         if (a[0] == "PLACE"):
             new_state[a[1]][a[2]] = self.colour
-            # implement capture rule
+            self.apply_capture(new_state, self.colour, (a[1], a[2]))
         elif (a[0] == "STEAL"):
             # TODO: CHECK THIS
             new_state[self.a[1]][a[2]] = 0
@@ -115,12 +127,6 @@ class Player:
             starts = [(i,0) for i in range(self.n)]
             goals = [(i,self.n-1) for i in range(self.n)]
 
-        # for i in range(self.n):
-        #     for j in starts:
-        #         node = starts[j]
-        #         if self.internal_board[node[0], node[1]] == self.colour:
-        #             if (self.bfs(node[0], node[1], goals)):
-        #                 return True
         for i in range(self.n):
             node = starts[i]
             if self.internal_board[node[0]][node[1]] == self.colour:
@@ -190,18 +196,47 @@ class Player:
         if(self.is_first_turn):
             self.first_turn = self.last_action
             self.is_first_turn = False
-        # put your code here
+
         if (self.last_action[0] == "PLACE"):
             self.internal_board[self.last_action[1]][self.last_action[2]] = player
-            # implement capture rule
+            self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
         elif (self.last_action[0] == "STEAL"):
             self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
             if (player == "blue"):
                 self.internal_board[self.first_turn[2]][self.first_turn[1]] = "blue"
             else:
                 self.internal_board[self.first_turn[2]][self.first_turn[1]] = "red"
-        # ANOTHER CASE: capture rule
 
         print("BOARD: ", self.internal_board)
 
 
+    def apply_capture(self, board, player, coord):
+        if (player == "red"):
+            opp = "blue"
+        else:
+            opp = "red"
+        captured = set()
+        
+        # Check each capture pattern intersecting with coord
+        for pattern in _CAPTURE_PATTERNS:
+            coords = [_ADD(coord, s) for s in pattern]
+            # No point checking if any coord is outside the board!
+            if all(map(self.inside_bounds, coords)):
+                tokens = [board[coord[0]][coord[1]] for coord in coords]
+                if tokens == [player, opp, opp]:
+                    # Capturing has to be deferred in case of overlaps
+                    # Both mid cell tokens should be captured
+                    captured.update(coords[1:])
+
+        # Remove any captured tokens
+        for coord in captured:
+            board[coord[0]][coord[1]] = 0
+
+
+    def inside_bounds(self, coord):
+        """
+        True iff coord inside board bounds.
+        Note: code borrowed from referee
+        """
+        r, q = coord
+        return r >= 0 and r < self.n and q >= 0 and q < self.n
