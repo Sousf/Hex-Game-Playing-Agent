@@ -31,7 +31,7 @@ class Player:
         rows, cols = (self.n, self.n)
         self.internal_board = [[0 for i in range(cols)] for j in range(rows)]
         self.is_first_turn = True
-        self.cutoff_depth = 3
+        self.cutoff_depth = 4
 
 
     def _get_eval_score(self, s):
@@ -41,8 +41,22 @@ class Player:
 
         # Getting closer to the opposite side gets a positive score
 
-        # each turn taken incur a -1 penalty
-        return randint(1,10)
+        # each turn taken incur a small penalty
+
+
+        # Having more of our own colour gets rewarded
+        same_colour = 0
+        opponent_colour = 0
+        for i in range(0, self.n):
+            for j in range(0,self.n):
+                if(s[0][i][j] == self.colour):
+                    same_colour += 1
+                elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
+                    opponent_colour += 1
+
+
+        eval_score = 0.2*(same_colour - opponent_colour)
+        return eval_score
 
     def _get_actions(self, s):
         """
@@ -61,25 +75,6 @@ class Player:
         if (self.is_first_turn and self.colour == "red" and (("PLACE", (self.n-1)/2, (self.n-1)/2) in actions)):
             actions.remove(("PLACE", (self.n-1)/2, (self.n-1)/2))
         return actions
-
-    def _max_value(self, s, a, alpha, beta):
-        """
-        Player's turn
-        Get the maximum of the minimum values
-        """
-        # s = [self.internal_board, depth]
-        s[1] += 1
-        if (s[1] == self.cutoff_depth and (not self._is_terminal(s))):
-            return self._get_eval_score(s)
-
-        max_eval = -inf
-        for a in self._get_actions(s):
-            v = self._min_value([self.result(s, a), s[1]], a, alpha, beta)
-            max_eval = max(v, max_eval)
-            alpha = max(alpha, max_eval)
-            if(beta <= alpha):
-                break
-        return max_eval
 
     def result(self, s, a):
         """
@@ -103,7 +98,25 @@ class Player:
 
         return new_state
 
+    def _max_value(self, s, a, alpha, beta):
+        """
+        Player's turn
+        Get the maximum of the minimum values
+        """
+        # s = [self.internal_board, depth]
+        # s[1] += 1
+        print("max", s[1])
+        if (s[1] == self.cutoff_depth or (not self._is_terminal(s))):
+            return self._get_eval_score(s)
 
+        max_eval = -inf
+        for a in self._get_actions(s):
+            v = self._min_value([self.result(s, a), s[1]+1], a, alpha, beta)
+            max_eval = max(v, max_eval)
+            alpha = max(alpha, max_eval)
+            if(beta <= alpha):
+                break
+        return max_eval
 
     def _min_value(self, s, a, alpha, beta):
         """
@@ -111,13 +124,14 @@ class Player:
         Get the minimum of the maximum's value
         """
         # s = [self.internal_board, depth]
-        s[1] = s[1] + 1
-        if (s[1] == self.cutoff_depth and (not self._is_terminal(s))):
+        # s[1] = s[1] + 1
+        print("min", s[1])
+        if (s[1] == self.cutoff_depth or (not self._is_terminal(s))):
             return self._get_eval_score(s)
 
         min_val = inf
         for a in self._get_actions(s):
-            v = self._max_value([self.result(s, a), s[1]], a, alpha, beta)
+            v = self._max_value([self.result(s, a), s[1]+1], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -184,7 +198,7 @@ class Player:
         # Line below is taking forever
         alpha = -inf
         beta = inf
-        values = [self._min_value([self.result(s,a), s[1]], a, alpha, beta) for a in actions]
+        values = [self._min_value([self.result(s,a), s[1]+1], a, alpha, beta) for a in actions]
         print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
