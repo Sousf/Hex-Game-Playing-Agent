@@ -1,6 +1,7 @@
 from cmath import inf
 import copy
 from random import randint
+import time
 from numpy import zeros, array, roll, vectorize
 
 
@@ -51,29 +52,34 @@ class Player:
         actions = []
         for i in range(self.n):
             for j in range(self.n):
-                if (self.internal_board[i][j] != "blue" and self.internal_board[i][j] != "red"):
+                if (s[0][i][j] != "blue" and s[0][i][j] != "red"):
                     actions.append(("PLACE", i, j))
         # need to add aciton for steal??
         if (self.is_first_turn and self.colour == "blue"):
             actions.append(("STEAL", ))
 
+        if (self.is_first_turn and self.colour == "red" and (("PLACE", (self.n-1)/2, (self.n-1)/2) in actions)):
+            actions.remove(("PLACE", (self.n-1)/2, (self.n-1)/2))
         return actions
 
-    def _max_value(self, s, a):
+    def _max_value(self, s, a, alpha, beta):
         """
         Player's turn
         Get the maximum of the minimum values
         """
-
         # s = [self.internal_board, depth]
         s[1] += 1
-        if (s[1] == self.cutoff_depth):
+        if (s[1] == self.cutoff_depth and (not self._is_terminal(s))):
             return self._get_eval_score(s)
 
-        v = -inf
+        max_eval = -inf
         for a in self._get_actions(s):
-            v = max(v, self._min_value([self.result(s, a), s[1]], a))
-        return v
+            v = self._min_value([self.result(s, a), s[1]], a, alpha, beta)
+            max_eval = max(v, max_eval)
+            alpha = max(alpha, max_eval)
+            if(beta <= alpha):
+                break
+        return max_eval
 
     def result(self, s, a):
         """
@@ -90,31 +96,35 @@ class Player:
             # TODO: CHECK THIS
             new_state[self.a[1]][a[2]] = 0
             if (self.colour == "blue"):
-                new_state[a[2]][a[1]] = "blue"
+                new_state[a[2]][a[1]] = "blue" 
             else:
-                new_state[a[2]][a[1]] = "red"
+                new_state[a[2]][a[1]] = "red" 
         # ANOTHER CASE: capture rule
 
         return new_state
 
 
 
-    def _min_value(self, s, a):
+    def _min_value(self, s, a, alpha, beta):
         """
         Opponent's turn
         Get the minimum of the maximum's value
         """
         # s = [self.internal_board, depth]
         s[1] = s[1] + 1
-        if (s[1] == self.cutoff_depth and (not self._is_terminal(s, a))):
+        if (s[1] == self.cutoff_depth and (not self._is_terminal(s))):
             return self._get_eval_score(s)
 
-        v = inf
+        min_val = inf
         for a in self._get_actions(s):
-            v = min(v, self._max_value([self.result(s, a), s[1]], a))
-        return v
+            v = self._max_value([self.result(s, a), s[1]], a, alpha, beta)
+            min_val = min(v, min_val)
+            beta = min(beta, v)
+            if(beta <= alpha):
+                break
+        return min_val
 
-    def _is_terminal(self, s, a):
+    def _is_terminal(self, s):
         # s = [self.internal_board, depth]
         # action = ("PLACE", r, q)
         
@@ -127,32 +137,32 @@ class Player:
 
         for i in range(self.n):
             node = starts[i]
-            if self.internal_board[node[0]][node[1]] == self.colour:
-                if (self.bfs(node[0], node[1], goals)):
+            if s[0][node[0]][node[1]] == self.colour:
+                if (self.bfs(node[0], node[1], goals, s)):
                     return True
         return False
 
 
-    def bfs(self, r, q, goals):
+    def bfs(self, r, q, goals, s):
         visited = [(r,q)]
         queue = [(r,q)]
         while (queue != []):
             curr = queue.pop(0)
             if curr in goals:
                 return True
-            for neighbour in self.get_neighbours(curr[0], curr[1]):
+            for neighbour in self.get_neighbours(curr[0], curr[1], s):
                 if neighbour not in visited:
                     queue.append(neighbour)
                     visited.append(neighbour)
         return False
 
 
-    def get_neighbours(self, r, q):
+    def get_neighbours(self, r, q, s):
         firsts = [r+1, r-1, r, r, r+1, r-1]
         seconds = [q, q, q+1, q-1, q-1, q+1]
         neighbours = []
         for i in range(len(firsts)):
-            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and self.internal_board[firsts[i]][seconds[i]] == self.colour):
+            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and s[0][firsts[i]][seconds[i]] == self.colour):
                 neighbours.append((firsts[i], seconds[i]))
         return neighbours
 
@@ -168,7 +178,14 @@ class Player:
         depth = 0
         s = [self.internal_board, depth]
         actions = self._get_actions(s)
-        values = [self._min_value([self.result(s,a), s[1]], a) for a in actions]
+
+        start_time = time.time()
+
+        # Line below is taking forever
+        alpha = -inf
+        beta = inf
+        values = [self._min_value([self.result(s,a), s[1]], a, alpha, beta) for a in actions]
+        print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
         action = actions[values.index(max_value)]
