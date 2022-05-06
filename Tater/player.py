@@ -1,9 +1,9 @@
 from cmath import inf
 import copy
 from random import randint
-import random
 import time
 from numpy import zeros, array, roll, vectorize
+from bot.node import Node
 
 
 
@@ -29,21 +29,44 @@ class Player:
         # put your code here
         self.n = n
         self.colour = player
+        if self.colour == "red":
+            self.opp_colour = "blue"
+        else:
+            self.opp_colour = "red"
+        
         rows, cols = (self.n, self.n)
         self.internal_board = [[0 for i in range(cols)] for j in range(rows)]
         self.is_first_turn = True
-        self.cutoff_depth = 4
+        self.cutoff_depth = 3
 
 
-    def _get_eval_score(self, s):
-        # Capturing opponent's pieces gets positive score
+    def _get_eval_score(self, s, a):
 
         # Forming a chain get a positive score
 
-        # Getting closer to the opposite side gets a positive score
+        # find shortest path between start and last_coord
 
-        # each turn taken incur a -1 penalty
-        random.seed(10)
+        # find the shortest path between last_coord and goal
+
+
+        # Having more of our own colour gets rewarded
+        same_colour = 0
+        opponent_colour = 0
+        opponent_pieces = []
+        for i in range(0, self.n):
+            for j in range(0,self.n):
+                if(s[0][i][j] == self.colour):
+                    same_colour += 1
+                elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
+                    opponent_colour += 1
+                    opponent_pieces.append((i,j))
+
+        last_coord = (a[1], a[2])
+        closest_node_on_diagonal_line = (a[1], self.n - 1 - a[1])
+        d = abs(last_coord[1] - closest_node_on_diagonal_line[1])
+
+        eval_score = 0.5*(same_colour - opponent_colour)
+        # assert(eval_score >= 0)
         return randint(1,10)
 
     def _get_actions(self, s):
@@ -54,7 +77,7 @@ class Player:
         actions = []
         for i in range(self.n):
             for j in range(self.n):
-                if (s[0][i][j] != "blue" and s[0][i][j] != "red"):
+                if (s[0][i][j] == 0):
                     actions.append(("PLACE", i, j))
         # need to add aciton for steal??
         if (self.is_first_turn and self.colour == "blue"):
@@ -64,7 +87,63 @@ class Player:
             actions.remove(("PLACE", (self.n-1)/2, (self.n-1)/2))
         return actions
 
-    def result(self, s, a):
+
+    def A_star_search(self, start, goal, n, block_list):
+        # Do A* Search
+        close_list = []
+
+        # Place starting/child nodes into open list
+        open_list = [Node(start[0], start[1], goal)]
+        final_node = None
+
+        while(len(open_list) != 0):
+            popped_node = open_list.pop(0) # O(l)
+            if (popped_node.get_coords() == goal):
+                final_node = popped_node
+                break
+            
+            children = popped_node.set_children(n).get_children()
+            for child in children:
+                if (child.get_coords() not in block_list):
+                    # case: child is in open
+                    if (child.get_coords() in [node.get_coords() for node in open_list]):
+                        for node in open_list:
+                            if (child.get_coords() == node.get_coords()) and (child.g() < node.g()):
+                                open_list.remove(node)
+                                open_list = self.insert_in_queue(open_list, child)
+                    # case: child is in close
+                    elif (child.get_coords() in [node.get_coords() for node in close_list]):
+                        for node in close_list:
+                            if (child.get_coords() == node.get_coords()) and (child.g() < node.g()):
+                                close_list.remove(node)
+                                open_list = self.insert_in_queue(open_list, child)
+                    # case: child has not been discovered yet
+                    else:
+                        open_list = self.insert_in_queue(open_list, child)
+
+            close_list.append(popped_node)
+
+        return final_node
+
+    # inserts new elements in correct position in queue
+    def insert_in_queue(self, queue, node): # O(l)
+        insert_index = len(queue)
+        for i in range(len(queue)):
+            if (node.f() <= queue[i].f()):
+                insert_index = i
+                break
+        queue.insert(insert_index, node) # l = length of queue, l. 
+        return queue
+
+
+    def get_path(self, node):
+        path = [node]
+        while node.get_parent() != None:
+            path.append(node.get_parent())
+            node = node.get_parent()
+        return path
+
+    def result(self, s, a, colour):
         """
         s: is the current internal board state
         a: the action we want to apply to the state
@@ -73,8 +152,8 @@ class Player:
         new_state = copy.deepcopy(s[0])
 
         if (a[0] == "PLACE"):
-            new_state[a[1]][a[2]] = self.colour
-            self.apply_capture(new_state, self.colour, (a[1], a[2]))
+            new_state[a[1]][a[2]] = colour
+            self.apply_capture(new_state, colour, (a[1], a[2]))
         elif (a[0] == "STEAL"):
             # TODO: CHECK THIS
             new_state[self.a[1]][a[2]] = 0
@@ -93,13 +172,13 @@ class Player:
         """
         # s = [self.internal_board, depth]
         # s[1] += 1
-        print("max", s[1])
-        if (s[1] == self.cutoff_depth or (not self._is_terminal(s))):
-            return self._get_eval_score(s)
+        # print("max", s[1])
+        if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
+            return self._get_eval_score(s, a)
 
         max_eval = -inf
         for a in self._get_actions(s):
-            v = self._min_value([self.result(s, a), s[1]+1], a, alpha, beta)
+            v = self._min_value([self.result(s, a, self.opp_colour), s[1]+1], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -113,13 +192,13 @@ class Player:
         """
         # s = [self.internal_board, depth]
         # s[1] = s[1] + 1
-        print("min", s[1])
-        if (s[1] == self.cutoff_depth or (not self._is_terminal(s))):
-            return self._get_eval_score(s)
+        # print("min", s[1])
+        if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
+            return self._get_eval_score(s, a)
 
         min_val = inf
         for a in self._get_actions(s):
-            v = self._max_value([self.result(s, a), s[1]+1], a, alpha, beta)
+            v = self._max_value([self.result(s, a, self.colour), s[1]+1], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -127,6 +206,7 @@ class Player:
         return min_val
 
     def _is_terminal(self, s):
+        """ Do bfs on every starting node of the corresponding colour and check if there is a path to the otherside"""
         # s = [self.internal_board, depth]
         # action = ("PLACE", r, q)
         
@@ -186,15 +266,12 @@ class Player:
         # Line below is taking forever
         alpha = -inf
         beta = inf
-        values = [self._min_value([self.result(s,a), s[1]+1], a, alpha, beta) for a in actions]
-        print("Process finished --- %s seconds ---" % (time.time() - start_time))
+        values = [self._min_value([self.result(s,a, self.opp_colour), s[1]+1], a, alpha, beta) for a in actions]
+        # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
         action = actions[values.index(max_value)]
         
-        # r = randint(0,self.n-1)
-        # q = randint(0,self.n-1)
-        # action = ("PLACE", r, q)
         return action
 
     
@@ -224,7 +301,8 @@ class Player:
             else:
                 self.internal_board[self.first_turn[2]][self.first_turn[1]] = "red"
 
-        print("BOARD: ", self.internal_board)
+
+        # print("BOARD: ", self.internal_board)
 
 
     def apply_capture(self, board, player, coord):
