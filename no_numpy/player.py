@@ -107,10 +107,10 @@ class Player:
         if (a[0] == "PLACE"):
             new_state[a[1]][a[2]] = colour
             num_captured = self.apply_capture(new_state, colour, (a[1], a[2]))
-            if (colour == self.colour):
-                s[2] -= num_captured
-            else:
-                s[3] -= num_captured
+            # if (colour == self.colour):
+            #     s[3] -= num_captured
+            # else:
+            #     s[2] -= num_captured
         elif (a[0] == "STEAL"):
             # TODO: CHECK THIS
             new_state[self.a[1]][a[2]] = 0
@@ -120,7 +120,7 @@ class Player:
                 new_state[a[2]][a[1]] = "red" 
         # ANOTHER CASE: capture rule
         # returns s[0] only
-        return [new_state, s[1], s[2], s[3]]
+        return [new_state, s[1], s[2], s[3]], num_captured
 
     def _max_value(self, s, a, alpha, beta):
         """
@@ -130,16 +130,17 @@ class Player:
         # s = [self.internal_board, depth, player_num, opp_num]
         # s[1] += 1
         # print("max", s[1])
+        # print("MAX: ############################")
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
-        print("MAX: ############################")
         max_eval = -inf
         actions = self._get_actions(s)
         for a in actions:
-            new = self.result(s, a, self.colour)
-            print((s[2], s[3]))
-            v = self._min_value([new[0], new[1]+1, new[2]+1, s[3]], a, alpha, beta)
+            new, num_cap = self.result(s, a, self.colour)
+            # print("curr board num: ", (s[2], s[3]))
+            # print("in the future placing: ", a)
+            v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -154,16 +155,17 @@ class Player:
         # s = [self.internal_board, depth, player_num, opp_num]
         # s[1] = s[1] + 1
         # print("min", s[1])
+        # print("MIN: ############################")
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
-        print("MIN: ############################")
         min_val = inf
         actions = self._get_actions(s)
         for a in actions:
-            new = self.result(s, a, self.colour)
-            print((s[2], s[3]))
-            v = self._max_value([new[0], new[1]+1, new[2], new[3]+1], a, alpha, beta)
+            new, num_cap = self.result(s, a, self.opp_colour)
+            # print("curr board num: ", (s[2], s[3]))
+            # print("in the future placing: ", a)
+            v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -234,14 +236,13 @@ class Player:
         values = []
         # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         for a in actions:
-            new = self.result(s,a, self.colour)
-            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]], a, alpha, beta))
+            new, num_cap = self.result(s,a, self.colour)
+            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap], a, alpha, beta))
         # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
         action = actions[values.index(max_value)]
-        
         return action
 
     
@@ -266,10 +267,10 @@ class Player:
             cap = self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
             if (player == self.colour):
                 self.player_pieces_num += 1
-                self.player_pieces_num -= cap
+                self.opp_pieces_num -= cap
             else:
                 self.opp_pieces_num += 1
-                self.opp_pieces_num -= cap
+                self.player_pieces_num -= cap
         elif (self.last_action[0] == "STEAL"):
             self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
             if (player == "blue"):
