@@ -1,7 +1,7 @@
 from cmath import inf
+import copy
 from random import randint
 import time
-import copy
 from numpy import average, zeros, array, roll, vectorize
 
 
@@ -33,14 +33,10 @@ class Player:
         else:
             self.opp_colour = "red"
         
-        # rows, cols = (self.n, self.n)
-        # self.internal_board = array([[0 for i in range(cols)] for j in range(rows)])
-        self.internal_board = zeros((self.n,self.n))
+        rows, cols = (self.n, self.n)
+        self.internal_board = [[0 for i in range(cols)] for j in range(rows)]
         self.is_first_turn = True
         self.cutoff_depth = 3
-
-        self.colour_dict = {"red":1.0, "blue":2.0}
-        self.num_to_colour = {0:0, 1.0:"red", 2.0:"blue"}
 
 
     def _get_eval_score(self, s, a):
@@ -60,10 +56,10 @@ class Player:
         dists_opponent = []
         for i in range(0, self.n):
             for j in range(0,self.n):
-                if(s[0][i][j] == self.colour_dict[self.colour]):
+                if(s[0][i][j] == self.colour):
                     same_colour += 1
                     dists_self.append(abs(self.n - 1 - i - j))
-                elif (s[0][i][j] != self.colour_dict[self.colour] and s[0][i][j] != 0):
+                elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
                     opponent_colour += 1
                     opponent_pieces.append((i,j))
                     dists_opponent.append(abs(self.n - 1 - i - j))
@@ -101,23 +97,22 @@ class Player:
         return updated state with action a.
         """
         new_state = copy.deepcopy(s[0])
-        # new_state = copy(s[0])
 
         if (a[0] == "PLACE"):
-            new_state[a[1]][a[2]] = self.colour_dict[colour]
+            new_state[a[1]][a[2]] = colour
             self.apply_capture(new_state, colour, (a[1], a[2]))
         elif (a[0] == "STEAL"):
             # TODO: CHECK THIS
             new_state[self.a[1]][a[2]] = 0
             if (self.colour == "blue"):
-                new_state[a[2]][a[1]] = self.colour_dict["blue"]
+                new_state[a[2]][a[1]] = "blue" 
             else:
-                new_state[a[2]][a[1]] = self.colour_dict["red"]
+                new_state[a[2]][a[1]] = "red" 
         # ANOTHER CASE: capture rule
 
         return new_state
 
-    def _max_value(self, s, a, alpha, beta):
+    def _max_value(self, s,a):
         """
         Player's turn
         Get the maximum of the minimum values
@@ -130,14 +125,11 @@ class Player:
 
         max_eval = -inf
         for a in self._get_actions(s):
-            v = self._min_value([self.result(s, a, self.colour), s[1]+1], a, alpha, beta)
+            v = self._min_value([self.result(s, a, self.colour), s[1]+1], a)
             max_eval = max(v, max_eval)
-            alpha = max(alpha, max_eval)
-            if(beta <= alpha):
-                break
         return max_eval
 
-    def _min_value(self, s, a, alpha, beta):
+    def _min_value(self, s, a):
         """
         Opponent's turn
         Get the minimum of the maximum's value
@@ -150,11 +142,8 @@ class Player:
 
         min_val = inf
         for a in self._get_actions(s):
-            v = self._max_value([self.result(s, a, self.opp_colour), s[1]+1], a, alpha, beta)
+            v = self._max_value([self.result(s, a, self.opp_colour), s[1]+1], a)
             min_val = min(v, min_val)
-            beta = min(beta, v)
-            if(beta <= alpha):
-                break
         return min_val
 
     def _is_terminal(self, s):
@@ -171,7 +160,7 @@ class Player:
 
         for i in range(self.n):
             node = starts[i]
-            if s[0][node[0]][node[1]] == self.colour_dict[self.colour]:
+            if s[0][node[0]][node[1]] == self.colour:
                 if (self.bfs(node[0], node[1], goals, s)):
                     return True
         return False
@@ -196,7 +185,7 @@ class Player:
         seconds = [q, q, q+1, q-1, q-1, q+1]
         neighbours = []
         for i in range(len(firsts)):
-            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and s[0][firsts[i]][seconds[i]] == self.colour_dict[self.colour]):
+            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and s[0][firsts[i]][seconds[i]] == self.colour):
                 neighbours.append((firsts[i], seconds[i]))
         return neighbours
 
@@ -219,7 +208,7 @@ class Player:
         values = []
         # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         for a in actions:
-            values.append(self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta))
+            values.append(self._min_value([self.result(s,a, self.colour), s[1]+1], a))
         # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
@@ -246,14 +235,14 @@ class Player:
             self.is_first_turn = False
 
         if (self.last_action[0] == "PLACE"):
-            self.internal_board[self.last_action[1]][self.last_action[2]] = self.colour_dict[player]
+            self.internal_board[self.last_action[1]][self.last_action[2]] = player
             self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
         elif (self.last_action[0] == "STEAL"):
             self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
             if (player == "blue"):
-                self.internal_board[self.first_turn[2]][self.first_turn[1]] = self.colour_dict["blue"]
+                self.internal_board[self.first_turn[2]][self.first_turn[1]] = "blue"
             else:
-                self.internal_board[self.first_turn[2]][self.first_turn[1]] = self.colour_dict["red"]
+                self.internal_board[self.first_turn[2]][self.first_turn[1]] = "red"
 
 
         # print("BOARD: ", self.internal_board)
@@ -271,7 +260,7 @@ class Player:
             coords = [_ADD(coord, s) for s in pattern]
             # No point checking if any coord is outside the board!
             if all(map(self.inside_bounds, coords)):
-                tokens = [self.num_to_colour[board[coord[0]][coord[1]]] for coord in coords]
+                tokens = [board[coord[0]][coord[1]] for coord in coords]
                 if tokens == [player, opp, opp]:
                     # Capturing has to be deferred in case of overlaps
                     # Both mid cell tokens should be captured
