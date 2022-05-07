@@ -1,7 +1,7 @@
 from cmath import inf
 import copy
 from random import randint
-from numpy import zeros, array, roll, vectorize
+from numpy import zeros, array, roll, vectorize, average
 
 
 
@@ -23,3 +23,4 @@ rows, cols = (n, n)
 internal_board = [["r" for i in range(cols)] for j in range(rows)]
 
 print(sys.getsizeof(internal_board))
+print(average([]))

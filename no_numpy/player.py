@@ -40,6 +40,8 @@ class Player:
 
         self.player_pieces_num = 0
         self.opp_pieces_num = 0
+        self.player_sum = 0
+        self.opp_sum = 0
 
 
     def _get_eval_score(self, s, a):
@@ -52,27 +54,38 @@ class Player:
 
 
         # Having more of our own colour gets rewarded
-        same_colour = 0
-        opponent_colour = 0
-        opponent_pieces = []
-        dists_self = []
-        dists_opponent = []
-        for i in range(0, self.n):
-            for j in range(0,self.n):
-                if(s[0][i][j] == self.colour):
-                    same_colour += 1
-                    dists_self.append(abs(self.n - 1 - i - j))
-                elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
-                    opponent_colour += 1
-                    opponent_pieces.append((i,j))
-                    dists_opponent.append(abs(self.n - 1 - i - j))
+        # same_colour = 0
+        # opponent_colour = 0
+        # opponent_pieces = []
+        # dists_self = []
+        # dists_opponent = []
+        # for i in range(0, self.n):
+        #     for j in range(0,self.n):
+        #         if(s[0][i][j] == self.colour):
+        #             same_colour += 1
+        #             dists_self.append(abs(self.n - 1 - i - j))
+        #         elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
+        #             opponent_colour += 1
+        #             opponent_pieces.append((i,j))
+        #             dists_opponent.append(abs(self.n - 1 - i - j))
 
-        print((s[2], s[3]), (same_colour, opponent_colour))
-        assert(s[2] == same_colour and s[3] == opponent_colour)
+        # print("COUNTTTT ", (s[2], s[3]), (same_colour, opponent_colour))
+        # assert(s[2] == same_colour and s[3] == opponent_colour)
+        # if (s[2] != 0 and s[3] != 0):
+        #     print((s[4]/s[2], s[5]/s[3]), (average(dists_self), average(dists_opponent)))
+        #     assert(s[4]/s[2] == average(dists_self) and s[5]/s[3] == average(dists_opponent))
+        if(s[2] == 0):
+            p_avg = 0
+        else:
+            p_avg = s[4]/s[2]
+        if(s[3] == 0):
+            opp_avg = 0
+        else:
+            opp_avg = s[5]/s[3]
 
-        dist_from_diag_diff = -(average(dists_self) - average(dists_opponent))
+        dist_from_diag_diff = -(p_avg - opp_avg)
 
-        eval_score = 0.5*(same_colour - opponent_colour) + 0.2*(dist_from_diag_diff)
+        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff)
 
         # eval_score = 0.5*(same_colour - opponent_colour) 
         # assert(eval_score >= 0)
@@ -106,7 +119,7 @@ class Player:
 
         if (a[0] == "PLACE"):
             new_state[a[1]][a[2]] = colour
-            num_captured = self.apply_capture(new_state, colour, (a[1], a[2]))
+            num_captured, sum_dist_from_center = self.apply_capture(new_state, colour, (a[1], a[2]))
             # if (colour == self.colour):
             #     s[3] -= num_captured
             # else:
@@ -120,7 +133,7 @@ class Player:
                 new_state[a[2]][a[1]] = "red" 
         # ANOTHER CASE: capture rule
         # returns s[0] only
-        return [new_state, s[1], s[2], s[3]], num_captured
+        return [new_state, s[1], s[2], s[3], s[4], s[5]], num_captured, sum_dist_from_center
 
     def _max_value(self, s, a, alpha, beta):
         """
@@ -137,10 +150,10 @@ class Player:
         max_eval = -inf
         actions = self._get_actions(s)
         for a in actions:
-            new, num_cap = self.result(s, a, self.colour)
+            new, num_cap, sum_dist_from_center = self.result(s, a, self.colour)
             # print("curr board num: ", (s[2], s[3]))
             # print("in the future placing: ", a)
-            v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap], a, alpha, beta)
+            v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + abs(self.n - 1 - a[1] - a[2]),  new[5] - sum_dist_from_center], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -152,7 +165,7 @@ class Player:
         Opponent's turn
         Get the minimum of the maximum's value
         """
-        # s = [self.internal_board, depth, player_num, opp_num]
+        # s = [self.internal_board, depth, player_num, opp_num, p_sum, opp_sum]
         # s[1] = s[1] + 1
         # print("min", s[1])
         # print("MIN: ############################")
@@ -162,10 +175,10 @@ class Player:
         min_val = inf
         actions = self._get_actions(s)
         for a in actions:
-            new, num_cap = self.result(s, a, self.opp_colour)
+            new, num_cap, sum_dist_from_center = self.result(s, a, self.opp_colour)
             # print("curr board num: ", (s[2], s[3]))
             # print("in the future placing: ", a)
-            v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1], a, alpha, beta)
+            v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1, new[4] - sum_dist_from_center, new[5] + abs(self.n - 1 - a[1] - a[2])], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -227,7 +240,9 @@ class Player:
         depth = 0
         player_num = self.player_pieces_num
         opp_num = self.opp_pieces_num
-        s = [self.internal_board, depth, player_num, opp_num]
+        p_sum = self.player_sum
+        opp_sum = self.opp_sum
+        s = [self.internal_board, depth, player_num, opp_num, p_sum, opp_sum]
         actions = self._get_actions(s)
 
         # Line below is taking forever
@@ -236,8 +251,8 @@ class Player:
         values = []
         # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         for a in actions:
-            new, num_cap = self.result(s,a, self.colour)
-            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap], a, alpha, beta))
+            new, num_cap, sum_dist_from_center = self.result(s,a, self.colour)
+            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + abs(self.n - 1 - a[1] - a[2]), opp_sum - sum_dist_from_center], a, alpha, beta))
         # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
@@ -264,13 +279,17 @@ class Player:
 
         if (self.last_action[0] == "PLACE"):
             self.internal_board[self.last_action[1]][self.last_action[2]] = player
-            cap = self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
+            cap, sum_dist_from_center = self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
             if (player == self.colour):
                 self.player_pieces_num += 1
                 self.opp_pieces_num -= cap
+                self.player_sum += abs(self.n - 1 - action[1] - action[2])
+                self.opp_sum -= sum_dist_from_center
             else:
                 self.opp_pieces_num += 1
                 self.player_pieces_num -= cap
+                self.opp_sum += abs(self.n - 1 - action[1] - action[2])
+                self.player_sum -= sum_dist_from_center
         elif (self.last_action[0] == "STEAL"):
             self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
             if (player == "blue"):
@@ -301,9 +320,11 @@ class Player:
                     captured.update(coords[1:])
 
         # Remove any captured tokens
+        sum_dist_from_center = 0
         for coord in captured:
             board[coord[0]][coord[1]] = 0
-        return len(captured)
+            sum_dist_from_center += abs(self.n - 1 - coord[0] - coord[1])
+        return len(captured), sum_dist_from_center
 
 
     def inside_bounds(self, coord):

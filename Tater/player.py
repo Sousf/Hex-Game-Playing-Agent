@@ -2,7 +2,7 @@ from cmath import inf
 import copy
 from random import randint
 import time
-from numpy import zeros, array, roll, vectorize
+from numpy import average, zeros, array, roll, vectorize
 
 
 
@@ -52,21 +52,25 @@ class Player:
         same_colour = 0
         opponent_colour = 0
         opponent_pieces = []
+        dists_self = []
+        dists_opponent = []
         for i in range(0, self.n):
             for j in range(0,self.n):
                 if(s[0][i][j] == self.colour):
                     same_colour += 1
+                    dists_self.append(abs(self.n - 1 - i - j))
                 elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
                     opponent_colour += 1
                     opponent_pieces.append((i,j))
+                    dists_opponent.append(abs(self.n - 1 - i - j))
 
-        last_coord = (a[1], a[2])
-        closest_node_on_diagonal_line = (a[1], self.n - 1 - a[1])
-        d = abs(last_coord[1] - closest_node_on_diagonal_line[1])
+        dist_from_diag_diff = -(average(dists_self) - average(dists_opponent))
 
-        eval_score = 0.5*(same_colour - opponent_colour)
+        eval_score = 0.5*(same_colour - opponent_colour) + 0.2*(dist_from_diag_diff)
+
+        # eval_score = 0.5*(same_colour - opponent_colour) 
         # assert(eval_score >= 0)
-        return randint(1,10)
+        return eval_score
 
     def _get_actions(self, s):
         """
@@ -85,62 +89,6 @@ class Player:
         if (self.is_first_turn and self.colour == "red" and (("PLACE", (self.n-1)/2, (self.n-1)/2) in actions)):
             actions.remove(("PLACE", (self.n-1)/2, (self.n-1)/2))
         return actions
-
-
-    def A_star_search(self, start, goal, n, block_list):
-        # Do A* Search
-        close_list = []
-
-        # Place starting/child nodes into open list
-        open_list = [Node(start[0], start[1], goal)]
-        final_node = None
-
-        while(len(open_list) != 0):
-            popped_node = open_list.pop(0) # O(l)
-            if (popped_node.get_coords() == goal):
-                final_node = popped_node
-                break
-            
-            children = popped_node.set_children(n).get_children()
-            for child in children:
-                if (child.get_coords() not in block_list):
-                    # case: child is in open
-                    if (child.get_coords() in [node.get_coords() for node in open_list]):
-                        for node in open_list:
-                            if (child.get_coords() == node.get_coords()) and (child.g() < node.g()):
-                                open_list.remove(node)
-                                open_list = self.insert_in_queue(open_list, child)
-                    # case: child is in close
-                    elif (child.get_coords() in [node.get_coords() for node in close_list]):
-                        for node in close_list:
-                            if (child.get_coords() == node.get_coords()) and (child.g() < node.g()):
-                                close_list.remove(node)
-                                open_list = self.insert_in_queue(open_list, child)
-                    # case: child has not been discovered yet
-                    else:
-                        open_list = self.insert_in_queue(open_list, child)
-
-            close_list.append(popped_node)
-
-        return final_node
-
-    # inserts new elements in correct position in queue
-    def insert_in_queue(self, queue, node): # O(l)
-        insert_index = len(queue)
-        for i in range(len(queue)):
-            if (node.f() <= queue[i].f()):
-                insert_index = i
-                break
-        queue.insert(insert_index, node) # l = length of queue, l. 
-        return queue
-
-
-    def get_path(self, node):
-        path = [node]
-        while node.get_parent() != None:
-            path.append(node.get_parent())
-            node = node.get_parent()
-        return path
 
     def result(self, s, a, colour):
         """
@@ -177,7 +125,7 @@ class Player:
 
         max_eval = -inf
         for a in self._get_actions(s):
-            v = self._min_value([self.result(s, a, self.opp_colour), s[1]+1], a, alpha, beta)
+            v = self._min_value([self.result(s, a, self.colour), s[1]+1], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -197,7 +145,7 @@ class Player:
 
         min_val = inf
         for a in self._get_actions(s):
-            v = self._max_value([self.result(s, a, self.colour), s[1]+1], a, alpha, beta)
+            v = self._max_value([self.result(s, a, self.opp_colour), s[1]+1], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -260,13 +208,14 @@ class Player:
         s = [self.internal_board, depth]
         actions = self._get_actions(s)
 
-        start_time = time.time()
-
         # Line below is taking forever
         alpha = -inf
         beta = inf
-        # values = [self._min_value([self.result(s,a, self.opp_colour), s[1]+1], a, alpha, beta) for a in actions]
-        values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
+        values = []
+        # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
+        for a in actions:
+            values.append(self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta))
+        # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
