@@ -38,6 +38,9 @@ class Player:
         self.is_first_turn = True
         self.cutoff_depth = 3
 
+        self.player_pieces_num = 0
+        self.opp_pieces_num = 0
+
 
     def _get_eval_score(self, s, a):
 
@@ -86,8 +89,8 @@ class Player:
                 if (s[0][i][j] == 0):
                     actions.append(("PLACE", i, j))
         # need to add aciton for steal??
-        if (self.is_first_turn and self.colour == "blue"):
-            actions.append(("STEAL", ))
+        # if (self.is_first_turn and self.colour == "blue"):
+        #     actions.append(("STEAL", ))
 
         if (self.is_first_turn and self.colour == "red" and (("PLACE", (self.n-1)/2, (self.n-1)/2) in actions)):
             actions.remove(("PLACE", (self.n-1)/2, (self.n-1)/2))
@@ -117,7 +120,7 @@ class Player:
                 new_state[a[2]][a[1]] = "red" 
         # ANOTHER CASE: capture rule
         # returns s[0] only
-        return new_state
+        return [new_state, s[1], s[2], s[3]]
 
     def _max_value(self, s, a, alpha, beta):
         """
@@ -130,11 +133,13 @@ class Player:
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
+        print("MAX: ############################")
         max_eval = -inf
         actions = self._get_actions(s)
         for a in actions:
             new = self.result(s, a, self.colour)
-            v = self._min_value([new, s[1]+1, s[2]+1, s[3]], a, alpha, beta)
+            print((s[2], s[3]))
+            v = self._min_value([new[0], new[1]+1, new[2]+1, s[3]], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -152,11 +157,13 @@ class Player:
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
+        print("MIN: ############################")
         min_val = inf
         actions = self._get_actions(s)
         for a in actions:
             new = self.result(s, a, self.colour)
-            v = self._max_value([new, s[1]+1, s[2], s[3]+1], a, alpha, beta)
+            print((s[2], s[3]))
+            v = self._max_value([new[0], new[1]+1, new[2], new[3]+1], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -216,8 +223,8 @@ class Player:
         # Return The Max value among all minimised value
         
         depth = 0
-        player_num = 0
-        opp_num = 0
+        player_num = self.player_pieces_num
+        opp_num = self.opp_pieces_num
         s = [self.internal_board, depth, player_num, opp_num]
         actions = self._get_actions(s)
 
@@ -228,7 +235,7 @@ class Player:
         # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         for a in actions:
             new = self.result(s,a, self.colour)
-            values.append(self._min_value([new, depth+1, player_num, opp_num], a, alpha, beta))
+            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]], a, alpha, beta))
         # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
@@ -256,7 +263,13 @@ class Player:
 
         if (self.last_action[0] == "PLACE"):
             self.internal_board[self.last_action[1]][self.last_action[2]] = player
-            self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
+            cap = self.apply_capture(self.internal_board, player, (self.last_action[1], self.last_action[2]))
+            if (player == self.colour):
+                self.player_pieces_num += 1
+                self.player_pieces_num -= cap
+            else:
+                self.opp_pieces_num += 1
+                self.opp_pieces_num -= cap
         elif (self.last_action[0] == "STEAL"):
             self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
             if (player == "blue"):
