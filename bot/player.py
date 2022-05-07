@@ -122,7 +122,7 @@ class Player:
         Player's turn
         Get the maximum of the minimum values
         """
-        # s = [self.internal_board, depth]
+        # s = [self.internal_board, depth, same_colour_num, opp_colour_num]
         # s[1] += 1
         # print("max", s[1])
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):

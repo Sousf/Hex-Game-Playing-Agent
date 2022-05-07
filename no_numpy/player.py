@@ -64,6 +64,9 @@ class Player:
                     opponent_pieces.append((i,j))
                     dists_opponent.append(abs(self.n - 1 - i - j))
 
+        print((s[2], s[3]), (same_colour, opponent_colour))
+        assert(s[2] == same_colour and s[3] == opponent_colour)
+
         dist_from_diag_diff = -(average(dists_self) - average(dists_opponent))
 
         eval_score = 0.5*(same_colour - opponent_colour) + 0.2*(dist_from_diag_diff)
@@ -100,7 +103,11 @@ class Player:
 
         if (a[0] == "PLACE"):
             new_state[a[1]][a[2]] = colour
-            self.apply_capture(new_state, colour, (a[1], a[2]))
+            num_captured = self.apply_capture(new_state, colour, (a[1], a[2]))
+            if (colour == self.colour):
+                s[2] -= num_captured
+            else:
+                s[3] -= num_captured
         elif (a[0] == "STEAL"):
             # TODO: CHECK THIS
             new_state[self.a[1]][a[2]] = 0
@@ -109,7 +116,7 @@ class Player:
             else:
                 new_state[a[2]][a[1]] = "red" 
         # ANOTHER CASE: capture rule
-
+        # returns s[0] only
         return new_state
 
     def _max_value(self, s, a, alpha, beta):
@@ -117,15 +124,17 @@ class Player:
         Player's turn
         Get the maximum of the minimum values
         """
-        # s = [self.internal_board, depth]
+        # s = [self.internal_board, depth, player_num, opp_num]
         # s[1] += 1
         # print("max", s[1])
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         max_eval = -inf
-        for a in self._get_actions(s):
-            v = self._min_value([self.result(s, a, self.colour), s[1]+1], a, alpha, beta)
+        actions = self._get_actions(s)
+        for a in actions:
+            new = self.result(s, a, self.colour)
+            v = self._min_value([new, s[1]+1, s[2]+1, s[3]], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -137,15 +146,17 @@ class Player:
         Opponent's turn
         Get the minimum of the maximum's value
         """
-        # s = [self.internal_board, depth]
+        # s = [self.internal_board, depth, player_num, opp_num]
         # s[1] = s[1] + 1
         # print("min", s[1])
         if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         min_val = inf
-        for a in self._get_actions(s):
-            v = self._max_value([self.result(s, a, self.opp_colour), s[1]+1], a, alpha, beta)
+        actions = self._get_actions(s)
+        for a in actions:
+            new = self.result(s, a, self.colour)
+            v = self._max_value([new, s[1]+1, s[2], s[3]+1], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -205,7 +216,9 @@ class Player:
         # Return The Max value among all minimised value
         
         depth = 0
-        s = [self.internal_board, depth]
+        player_num = 0
+        opp_num = 0
+        s = [self.internal_board, depth, player_num, opp_num]
         actions = self._get_actions(s)
 
         # Line below is taking forever
@@ -214,7 +227,8 @@ class Player:
         values = []
         # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         for a in actions:
-            values.append(self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta))
+            new = self.result(s,a, self.colour)
+            values.append(self._min_value([new, depth+1, player_num, opp_num], a, alpha, beta))
         # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
@@ -275,6 +289,7 @@ class Player:
         # Remove any captured tokens
         for coord in captured:
             board[coord[0]][coord[1]] = 0
+        return len(captured)
 
 
     def inside_bounds(self, coord):
