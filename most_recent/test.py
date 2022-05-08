@@ -1,7 +1,7 @@
 from cmath import inf
 import copy
 from random import randint
-from numpy import zeros, array, roll, vectorize, average
+from numpy import sqrt, zeros, array, roll, vectorize, average, log
 
 
 
@@ -15,12 +15,17 @@ _CAPTURE_PATTERNS = [[_ADD(n1, n2), n1, n2]
         list(zip(_HEX_STEPS, roll(_HEX_STEPS, 2)))]
 
 
-print(_CAPTURE_PATTERNS)
+# print(_CAPTURE_PATTERNS)
 
 import sys
-n=8
-rows, cols = (n, n)
-internal_board = [["r" for i in range(cols)] for j in range(rows)]
+# n=8
+# rows, cols = (n, n)
+# internal_board = [["r" for i in range(cols)] for j in range(rows)]
 
-print(sys.getsizeof(internal_board))
-print(average([]))
+# print(sys.getsizeof(internal_board))
+# print(average([]))
+
+n = 4
+
+for x in range(1,n**2):
+    print("x: ", x ,"y: ", 2 + log(x/sqrt(n)))

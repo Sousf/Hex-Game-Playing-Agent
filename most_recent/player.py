@@ -3,7 +3,7 @@ import copy
 from math import ceil, floor
 from random import randint
 import time
-from numpy import average, sqrt, zeros, array, roll, vectorize
+from numpy import average, log, sqrt, zeros, array, roll, vectorize
 # from sqlalchemy import null
 
 
@@ -39,7 +39,7 @@ class Player:
         self.internal_board = [[0 for i in range(cols)] for j in range(rows)]
         self.is_first_turn = True
         self.is_blues_first_turn = False
-        self.cutoff_depth = 3
+        self.cutoff_depth = 1
         self.radius = ceil((self.n-1)/2) - 1
 
         self.player_pieces_num = 0
@@ -63,11 +63,14 @@ class Player:
         # f(x) = 1 + floor( x/lambda*n)
         # maybe we need a sqrt function
 
-        if (self.n <= 4):
-            cutoff_depth = 4
+        # if (self.n <= 4):
+        #     cutoff_depth = 4
+        # else:
+        #     cutoff_depth = 1 + floor(occupied / (increase_rate*self.n))
+        if (occupied == 0):
+            cutoff_depth = 1
         else:
-            cutoff_depth = 1 + floor(occupied / (increase_rate*self.n))
-
+            cutoff_depth = floor(2 + log(occupied/sqrt(3)))
         return (cutoff_depth)
         # return (1 + floor(sqrt(occupied / (increase_rate*self.n))))
 
@@ -178,7 +181,7 @@ class Player:
         # s[1] += 1
         # print("max", s[1])
         # print("MAX: ############################")
-        if (s[1] >= self._get_cutoff_depth(s[2], s[3]) or (self._is_terminal(s))):
+        if (s[1] >= self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         max_eval = -inf
@@ -215,7 +218,7 @@ class Player:
         # s[1] = s[1] + 1
         # print("min", s[1])
         # print("MIN: ############################")
-        if (s[1] >= self._get_cutoff_depth(s[2], s[3]) or (self._is_terminal(s))):
+        if (s[1] >= self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         min_val = inf
@@ -372,6 +375,7 @@ class Player:
                         is_stealCoord_reached = True
                         break
             self.internal_board[steal_coord[1]][steal_coord[0]] = "blue"
+        self.cutoff_depth = self._get_cutoff_depth(self.player_pieces_num, self.opp_pieces_num)
         
 
         # print("BOARD: ", self.internal_board)
