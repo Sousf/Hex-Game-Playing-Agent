@@ -5,4 +5,4 @@
 # example import below, you can define it in another file and import
 # it into this module with the name 'Player':
 
-from no_numpy.player import Player
+from most_recent.player import Player
