@@ -25,7 +25,7 @@ import sys
 # print(sys.getsizeof(internal_board))
 # print(average([]))
 
-n = 4
+n = 8
 
 for x in range(1,n**2):
-    print("x: ", x ,"y: ", 2 + log(x/sqrt(n)))
+    print("x: ", x ,"y: ", 1 + log((x)/sqrt(n)))

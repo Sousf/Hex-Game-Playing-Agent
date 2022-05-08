@@ -48,31 +48,29 @@ class Player:
         self.opp_sum = 0
         # self.last_action = null
 
+
     def _get_cutoff_depth(self, player_num, opp_num):
-        """
-        8x8
+        # occupied = player_num + opp_num
+        occupied = self.player_pieces_num + self.opp_pieces_num
+        empty = (self.n)**2 - occupied
 
-        if n = 8
-        cutoff depth = 1
-        if we have 8 pieces on the board, cutoffdepth = 1+1
-        if we have 16 pieces, cutoff depth = 2+1
-        """
-        increase_rate = 1.75
-        occupied = player_num + opp_num
-        # print("OCCUPIED: ", occupied, "cutoffdepth: ", (1 + floor(occupied / self.n)))
-        # f(x) = 1 + floor( x/lambda*n)
-        # maybe we need a sqrt function
-
-        # if (self.n <= 4):
-        #     cutoff_depth = 4
-        # else:
-        #     cutoff_depth = 1 + floor(occupied / (increase_rate*self.n))
-        if (occupied == 0):
+        if (empty <= 10):
+            cutoff_depth = 4
+        elif (empty > 10 and empty <= 30):
+            cutoff_depth = 3
+        elif (empty > 30 and empty <= 60):
+            cutoff_depth = 2
+        elif (empty >= 60):
             cutoff_depth = 1
-        else:
-            cutoff_depth = floor(2 + log(occupied/sqrt(3)))
+        ###########
+        # if (occupied == 0):
+        #     cutoff_depth = 1
+        # else:
+        #     cutoff_depth = floor(1 + log(occupied/sqrt(self.n)))
         return (cutoff_depth)
-        # return (1 + floor(sqrt(occupied / (increase_rate*self.n))))
+
+
+
 
     def _get_eval_score(self, s, a):
 
@@ -82,28 +80,6 @@ class Player:
 
         # find the shortest path between last_coord and goal
 
-
-        # Having more of our own colour gets rewarded
-        # same_colour = 0
-        # opponent_colour = 0
-        # opponent_pieces = []
-        # dists_self = []
-        # dists_opponent = []
-        # for i in range(0, self.n):
-        #     for j in range(0,self.n):
-        #         if(s[0][i][j] == self.colour):
-        #             same_colour += 1
-        #             dists_self.append(abs(self.n - 1 - i - j))
-        #         elif (s[0][i][j] != self.colour and s[0][i][j] != 0):
-        #             opponent_colour += 1
-        #             opponent_pieces.append((i,j))
-        #             dists_opponent.append(abs(self.n - 1 - i - j))
-
-        # print("COUNTTTT ", (s[2], s[3]), (same_colour, opponent_colour))
-        # assert(s[2] == same_colour and s[3] == opponent_colour)
-        # if (s[2] != 0 and s[3] != 0):
-        #     print((s[4]/s[2], s[5]/s[3]), (average(dists_self), average(dists_opponent)))
-        #     assert(s[4]/s[2] == average(dists_self) and s[5]/s[3] == average(dists_opponent))
         if(s[2] == 0):
             p_avg = 0
         else:
@@ -115,10 +91,12 @@ class Player:
 
         dist_from_diag_diff = -(p_avg - opp_avg)
 
-        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff)
+        winning_reward = 0
+        if (self._is_terminal(s)):
+            winning_reward = 100
 
-        # eval_score = 0.5*(same_colour - opponent_colour) 
-        # assert(eval_score >= 0)
+        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff) + winning_reward
+
         return eval_score
 
     def _get_actions(self, s, colour):
@@ -259,7 +237,7 @@ class Player:
         for i in range(self.n):
             node = starts[i]
             if s[0][node[0]][node[1]] == self.colour:
-                if (self.bfs(node[0], node[1], goals, s)):
+                if (self.dfs(node[0], node[1], goals, s)):
                     return True
         return False
 
@@ -274,6 +252,21 @@ class Player:
             for neighbour in self.get_neighbours(curr[0], curr[1], s):
                 if neighbour not in visited:
                     queue.append(neighbour)
+                    visited.append(neighbour)
+        return False
+
+    
+    def dfs(self, r, q, goals, s):
+        visited = [(r,q)]
+        stack = [(r,q)]
+        while (stack != []):
+            curr = stack.pop()
+            visited.append(curr)
+            if curr in goals:
+                return True
+            for neighbour in self.get_neighbours(curr[0], curr[1], s):
+                if neighbour not in visited:
+                    stack.append(neighbour)
                     visited.append(neighbour)
         return False
 
