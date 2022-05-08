@@ -36,6 +36,7 @@ class Player:
         rows, cols = (self.n, self.n)
         self.internal_board = [[0 for i in range(cols)] for j in range(rows)]
         self.is_first_turn = True
+        self.is_blues_first_turn = False
         self.cutoff_depth = 3
 
         self.player_pieces_num = 0
@@ -91,7 +92,7 @@ class Player:
         # assert(eval_score >= 0)
         return eval_score
 
-    def _get_actions(self, s):
+    def _get_actions(self, s, colour):
         """
         Get all possible actions at the current state
         """
@@ -101,11 +102,10 @@ class Player:
             for j in range(self.n):
                 if (s[0][i][j] == 0):
                     actions.append(("PLACE", i, j))
-        # need to add aciton for steal??
-        # if (self.is_first_turn and self.colour == "blue"):
-        #     actions.append(("STEAL", ))
+        if (self.is_blues_first_turn and colour == "blue"):
+            actions.append(("STEAL", ))
 
-        if (self.is_first_turn and self.colour == "red" and (("PLACE", (self.n-1)/2, (self.n-1)/2) in actions)):
+        if (self.is_first_turn and colour == "red" and (("PLACE", (self.n-1)/2, (self.n-1)/2) in actions)):
             actions.remove(("PLACE", (self.n-1)/2, (self.n-1)/2))
         return actions
 
@@ -117,23 +117,32 @@ class Player:
         """
         new_state = copy.deepcopy(s[0])
 
+        # set defaults
+        num_captured = 0
+        stolen_dist = 0
+    
+        sum_dist_from_center = 0
+
         if (a[0] == "PLACE"):
             new_state[a[1]][a[2]] = colour
             num_captured, sum_dist_from_center = self.apply_capture(new_state, colour, (a[1], a[2]))
-            # if (colour == self.colour):
-            #     s[3] -= num_captured
-            # else:
-            #     s[2] -= num_captured
         elif (a[0] == "STEAL"):
-            # TODO: CHECK THIS
-            new_state[self.a[1]][a[2]] = 0
-            if (self.colour == "blue"):
-                new_state[a[2]][a[1]] = "blue" 
-            else:
-                new_state[a[2]][a[1]] = "red" 
-        # ANOTHER CASE: capture rule
-        # returns s[0] only
-        return [new_state, s[1], s[2], s[3], s[4], s[5]], num_captured, sum_dist_from_center
+            is_stealCoord_reached = False
+            steal_coord = tuple()
+            for i in range(self.n):
+                if is_stealCoord_reached:
+                    break
+                for j in range(self.n):
+                    if new_state != 0:
+                        new_state[i][j] = 0
+                        steal_coord = (i,j)
+                        is_stealCoord_reached = True
+                        break
+            new_state[steal_coord[1]][steal_coord[0]] = "blue"
+            stolen_dist = abs(self.n - 1 - steal_coord[0] - steal_coord[1])
+
+
+        return [new_state, s[1], s[2], s[3], s[4], s[5]], num_captured, sum_dist_from_center, stolen_dist
 
     def _max_value(self, s, a, alpha, beta):
         """
@@ -148,12 +157,22 @@ class Player:
             return self._get_eval_score(s, a)
 
         max_eval = -inf
-        actions = self._get_actions(s)
+        actions = self._get_actions(s, self.colour)
+        print("ACTIONS: ", actions)
         for a in actions:
-            new, num_cap, sum_dist_from_center = self.result(s, a, self.colour)
+            new, num_cap, sum_dist_from_center, stolen_dist = self.result(s, a, self.colour)
+
+            dist_from_a = 0
+            if a[0] == "PLACE":
+                dist_from_a = abs(self.n - 1 - a[1] - a[2])
+
+            if (self.colour == "blue"):
+                v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a + stolen_dist,  new[5] - sum_dist_from_center - stolen_dist], a, alpha, beta)
+            else:
+                v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a - stolen_dist,  new[5] - sum_dist_from_center + stolen_dist], a, alpha, beta)
+
             # print("curr board num: ", (s[2], s[3]))
             # print("in the future placing: ", a)
-            v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + abs(self.n - 1 - a[1] - a[2]),  new[5] - sum_dist_from_center], a, alpha, beta)
             max_eval = max(v, max_eval)
             alpha = max(alpha, max_eval)
             if(beta <= alpha):
@@ -173,12 +192,19 @@ class Player:
             return self._get_eval_score(s, a)
 
         min_val = inf
-        actions = self._get_actions(s)
+        actions = self._get_actions(s, self.opp_colour)
+        
         for a in actions:
-            new, num_cap, sum_dist_from_center = self.result(s, a, self.opp_colour)
+            dist_from_a = 0
+            if a[0] == "PLACE":
+                dist_from_a = abs(self.n - 1 - a[1] - a[2])
+            new, num_cap, captured_dist, stolen_dist = self.result(s, a, self.opp_colour)
+            if (self.colour == "blue"):
+                v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1, new[4] - captured_dist + stolen_dist, new[5] + dist_from_a - stolen_dist], a, alpha, beta)
+            else:
+                v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1, new[4] - captured_dist - stolen_dist, new[5] + dist_from_a + stolen_dist], a, alpha, beta)
             # print("curr board num: ", (s[2], s[3]))
             # print("in the future placing: ", a)
-            v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1, new[4] - sum_dist_from_center, new[5] + abs(self.n - 1 - a[1] - a[2])], a, alpha, beta)
             min_val = min(v, min_val)
             beta = min(beta, v)
             if(beta <= alpha):
@@ -243,7 +269,7 @@ class Player:
         p_sum = self.player_sum
         opp_sum = self.opp_sum
         s = [self.internal_board, depth, player_num, opp_num, p_sum, opp_sum]
-        actions = self._get_actions(s)
+        actions = self._get_actions(s, self.colour)
 
         # Line below is taking forever
         alpha = -inf
@@ -251,8 +277,11 @@ class Player:
         values = []
         # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         for a in actions:
-            new, num_cap, sum_dist_from_center = self.result(s,a, self.colour)
-            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + abs(self.n - 1 - a[1] - a[2]), opp_sum - sum_dist_from_center], a, alpha, beta))
+            dist_from_a = 0
+            if a[0] == "PLACE":
+                dist_from_a = abs(self.n - 1 - a[1] - a[2])
+            new, num_cap, sum_dist_from_center, _ = self.result(s,a, self.colour)
+            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + dist_from_a, opp_sum - sum_dist_from_center], a, alpha, beta))
         # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
@@ -276,6 +305,9 @@ class Player:
         if(self.is_first_turn):
             self.first_turn = self.last_action
             self.is_first_turn = False
+            self.is_blues_first_turn = True
+        if (self.is_first_turn == False and player == "blue"):
+            self.is_blues_first_turn = False
 
         if (self.last_action[0] == "PLACE"):
             self.internal_board[self.last_action[1]][self.last_action[2]] = player
@@ -291,12 +323,19 @@ class Player:
                 self.opp_sum += abs(self.n - 1 - action[1] - action[2])
                 self.player_sum -= sum_dist_from_center
         elif (self.last_action[0] == "STEAL"):
-            self.internal_board[self.first_turn[1]][self.first_turn[2]] = 0
-            if (player == "blue"):
-                self.internal_board[self.first_turn[2]][self.first_turn[1]] = "blue"
-            else:
-                self.internal_board[self.first_turn[2]][self.first_turn[1]] = "red"
-
+            is_stealCoord_reached = False
+            steal_coord = tuple()
+            for i in range(self.n):
+                if is_stealCoord_reached:
+                    break
+                for j in range(self.n):
+                    if self.internal_board != 0:
+                        self.internal_board[i][j] = 0
+                        steal_coord = (i,j)
+                        is_stealCoord_reached = True
+                        break
+            self.internal_board[steal_coord[1]][steal_coord[0]] = "blue"
+        
 
         # print("BOARD: ", self.internal_board)
 
