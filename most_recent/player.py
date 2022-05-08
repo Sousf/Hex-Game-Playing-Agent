@@ -1,8 +1,10 @@
 from cmath import inf
 import copy
+from math import ceil, floor
 from random import randint
 import time
-from numpy import average, zeros, array, roll, vectorize
+from numpy import average, sqrt, zeros, array, roll, vectorize
+from sqlalchemy import null
 
 
 
@@ -38,12 +40,30 @@ class Player:
         self.is_first_turn = True
         self.is_blues_first_turn = False
         self.cutoff_depth = 3
+        self.radius = ceil((self.n-1)/2) - 1
 
         self.player_pieces_num = 0
         self.opp_pieces_num = 0
         self.player_sum = 0
         self.opp_sum = 0
+        self.last_action = null
 
+    def _get_cutoff_depth(self, player_num, opp_num):
+        """
+        8x8
+
+        if n = 8
+        cutoff depth = 1
+        if we have 8 pieces on the board, cutoffdepth = 1+1
+        if we have 16 pieces, cutoff depth = 2+1
+        """
+        increase_rate = 1.75
+        occupied = player_num + opp_num
+        # print("OCCUPIED: ", occupied, "cutoffdepth: ", (1 + floor(occupied / self.n)))
+        # f(x) = 1 + floor( x/lambda*n)
+        # maybe we need a sqrt function
+        return (1 + floor(occupied / (increase_rate*self.n)))
+        # return (1 + floor(sqrt(occupied / (increase_rate*self.n))))
 
     def _get_eval_score(self, s, a):
 
@@ -86,7 +106,7 @@ class Player:
 
         dist_from_diag_diff = -(p_avg - opp_avg)
 
-        eval_score = 0.5*(s[2] - s[3]) + 0*(dist_from_diag_diff)
+        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff)
 
         # eval_score = 0.5*(same_colour - opponent_colour) 
         # assert(eval_score >= 0)
@@ -148,16 +168,16 @@ class Player:
         Player's turn
         Get the maximum of the minimum values
         """
-        # s = [self.internal_board, depth, player_num, opp_num]
+        # s = [self.internal_board, depth, player_num, opp_num, p_sum, opp_sum]
         # s[1] += 1
         # print("max", s[1])
         # print("MAX: ############################")
-        if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
+        if (s[1] >= self._get_cutoff_depth(s[2], s[3]) or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         max_eval = -inf
         actions = self._get_actions(s, self.colour)
-        print("ACTIONS: ", actions)
+        # print("ACTIONS: ", actions)
         for a in actions:
             new, num_cap, captured_dist, stolen_dist = self.result(s, a, self.colour)
             dist_from_a = 0
@@ -189,7 +209,7 @@ class Player:
         # s[1] = s[1] + 1
         # print("min", s[1])
         # print("MIN: ############################")
-        if (s[1] == self.cutoff_depth or (self._is_terminal(s))):
+        if (s[1] >= self._get_cutoff_depth(s[2], s[3]) or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         min_val = inf
@@ -267,9 +287,9 @@ class Player:
         # put your code here
         # Return The Max value among all minimised value
 
-        depth = 0
         player_num = self.player_pieces_num
         opp_num = self.opp_pieces_num
+        depth = 0
         p_sum = self.player_sum
         opp_sum = self.opp_sum
         s = [self.internal_board, depth, player_num, opp_num, p_sum, opp_sum]
@@ -293,7 +313,7 @@ class Player:
                 values.append(self._min_value([new[0], new[1]+1, new[2]+1+stolen, new[3]-num_cap-stolen, new[4] + dist_from_a + stolen_dist,  new[5] - captured_dist - stolen_dist], a, alpha, beta))
             else:
                 values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a - stolen_dist,  new[5] - captured_dist + stolen_dist], a, alpha, beta))
-            print("doing action: ", a, "yields an evaluation score of", self._get_eval_score([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + dist_from_a, opp_sum - captured_dist], a))
+            # print("doing action: ", a, "yields an evaluation score of", self._get_eval_score([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + dist_from_a, opp_sum - captured_dist], a))
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
