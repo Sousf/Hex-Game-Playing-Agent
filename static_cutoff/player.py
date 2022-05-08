@@ -48,29 +48,6 @@ class Player:
         self.opp_sum = 0
         # self.last_action = null
 
-    def _get_cutoff_depth(self, player_num, opp_num):
-        """
-        8x8
-
-        if n = 8
-        cutoff depth = 1
-        if we have 8 pieces on the board, cutoffdepth = 1+1
-        if we have 16 pieces, cutoff depth = 2+1
-        """
-        increase_rate = 1.75
-        occupied = player_num + opp_num
-        # print("OCCUPIED: ", occupied, "cutoffdepth: ", (1 + floor(occupied / self.n)))
-        # f(x) = 1 + floor( x/lambda*n)
-        # maybe we need a sqrt function
-
-        if (self.n <= 4):
-            cutoff_depth = 4
-        else:
-            cutoff_depth = 1 + floor(occupied / (increase_rate*self.n))
-
-        return (cutoff_depth)
-        # return (1 + floor(sqrt(occupied / (increase_rate*self.n))))
-
     def _get_eval_score(self, s, a):
 
         # Forming a chain get a positive score
@@ -178,7 +155,7 @@ class Player:
         # s[1] += 1
         # print("max", s[1])
         # print("MAX: ############################")
-        if (s[1] >= self._get_cutoff_depth(s[2], s[3]) or (self._is_terminal(s))):
+        if (s[1] >= self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         max_eval = -inf
@@ -215,7 +192,7 @@ class Player:
         # s[1] = s[1] + 1
         # print("min", s[1])
         # print("MIN: ############################")
-        if (s[1] >= self._get_cutoff_depth(s[2], s[3]) or (self._is_terminal(s))):
+        if (s[1] >= self.cutoff_depth or (self._is_terminal(s))):
             return self._get_eval_score(s, a)
 
         min_val = inf
