@@ -86,7 +86,7 @@ class Player:
 
         dist_from_diag_diff = -(p_avg - opp_avg)
 
-        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff)
+        eval_score = 0.5*(s[2] - s[3]) + 0*(dist_from_diag_diff)
 
         # eval_score = 0.5*(same_colour - opponent_colour) 
         # assert(eval_score >= 0)
@@ -141,7 +141,6 @@ class Player:
             new_state[steal_coord[1]][steal_coord[0]] = "blue"
             stolen_dist = abs(self.n - 1 - steal_coord[0] - steal_coord[1])
 
-
         return [new_state, s[1], s[2], s[3], s[4], s[5]], num_captured, sum_dist_from_center, stolen_dist
 
     def _max_value(self, s, a, alpha, beta):
@@ -160,16 +159,18 @@ class Player:
         actions = self._get_actions(s, self.colour)
         print("ACTIONS: ", actions)
         for a in actions:
-            new, num_cap, sum_dist_from_center, stolen_dist = self.result(s, a, self.colour)
-
+            new, num_cap, captured_dist, stolen_dist = self.result(s, a, self.colour)
             dist_from_a = 0
             if a[0] == "PLACE":
                 dist_from_a = abs(self.n - 1 - a[1] - a[2])
+                stolen = 0
+            else:
+                stolen = 1
 
             if (self.colour == "blue"):
-                v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a + stolen_dist,  new[5] - sum_dist_from_center - stolen_dist], a, alpha, beta)
+                v = self._min_value([new[0], new[1]+1, new[2]+1+stolen, new[3]-num_cap-stolen, new[4] + dist_from_a + stolen_dist,  new[5] - captured_dist - stolen_dist], a, alpha, beta)
             else:
-                v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a - stolen_dist,  new[5] - sum_dist_from_center + stolen_dist], a, alpha, beta)
+                v = self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a - stolen_dist,  new[5] - captured_dist + stolen_dist], a, alpha, beta)
 
             # print("curr board num: ", (s[2], s[3]))
             # print("in the future placing: ", a)
@@ -198,9 +199,12 @@ class Player:
             dist_from_a = 0
             if a[0] == "PLACE":
                 dist_from_a = abs(self.n - 1 - a[1] - a[2])
+                stolen = 0
+            else:
+                stolen = 1
             new, num_cap, captured_dist, stolen_dist = self.result(s, a, self.opp_colour)
             if (self.colour == "blue"):
-                v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1, new[4] - captured_dist + stolen_dist, new[5] + dist_from_a - stolen_dist], a, alpha, beta)
+                v = self._max_value([new[0], new[1]+1, new[2] - num_cap + stolen, new[3] + 1 - stolen, new[4] - captured_dist + stolen_dist, new[5] + dist_from_a - stolen_dist], a, alpha, beta)
             else:
                 v = self._max_value([new[0], new[1]+1, new[2] - num_cap, new[3]+1, new[4] - captured_dist - stolen_dist, new[5] + dist_from_a + stolen_dist], a, alpha, beta)
             # print("curr board num: ", (s[2], s[3]))
@@ -262,7 +266,7 @@ class Player:
         """
         # put your code here
         # Return The Max value among all minimised value
-        
+
         depth = 0
         player_num = self.player_pieces_num
         opp_num = self.opp_pieces_num
@@ -275,14 +279,21 @@ class Player:
         alpha = -inf
         beta = inf
         values = []
-        # values = [self._max_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
+        
         for a in actions:
+            new, num_cap, captured_dist, stolen_dist = self.result(s,a, self.colour)
             dist_from_a = 0
             if a[0] == "PLACE":
                 dist_from_a = abs(self.n - 1 - a[1] - a[2])
-            new, num_cap, sum_dist_from_center, _ = self.result(s,a, self.colour)
-            values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + dist_from_a, opp_sum - sum_dist_from_center], a, alpha, beta))
-        # values = [self._min_value([self.result(s,a, self.colour), s[1]+1], a, alpha, beta) for a in actions]
+                stolen = 0
+            else:
+                stolen = 1
+            
+            if self.colour == "blue":
+                values.append(self._min_value([new[0], new[1]+1, new[2]+1+stolen, new[3]-num_cap-stolen, new[4] + dist_from_a + stolen_dist,  new[5] - captured_dist - stolen_dist], a, alpha, beta))
+            else:
+                values.append(self._min_value([new[0], new[1]+1, new[2]+1, new[3]-num_cap, new[4] + dist_from_a - stolen_dist,  new[5] - captured_dist + stolen_dist], a, alpha, beta))
+            print("doing action: ", a, "yields an evaluation score of", self._get_eval_score([new[0], new[1]+1, new[2]+1, new[3]-num_cap, p_sum + dist_from_a, opp_sum - captured_dist], a))
         # print("Process finished --- %s seconds ---" % (time.time() - start_time))
         
         max_value = max(values)
@@ -329,7 +340,7 @@ class Player:
                 if is_stealCoord_reached:
                     break
                 for j in range(self.n):
-                    if self.internal_board != 0:
+                    if self.internal_board[i][j] == "red":
                         self.internal_board[i][j] = 0
                         steal_coord = (i,j)
                         is_stealCoord_reached = True
