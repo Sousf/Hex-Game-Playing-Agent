@@ -72,7 +72,7 @@ class Player:
 
 
 
-    def _get_eval_score(self, s, a):
+    def _get_eval_score(self, s, a, colour):
 
         # Forming a chain get a positive score
 
@@ -92,10 +92,19 @@ class Player:
         dist_from_diag_diff = -(p_avg - opp_avg)
 
         winning_reward = 0
-        if (self._is_terminal(s)):
+        if (self._is_terminal(s, colour)):
             winning_reward = 100
 
-        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff) + winning_reward
+        losing_penalty = 0
+        if (colour == "red"):
+            if (self._is_terminal(s, "blue")):
+                losing_penalty = -200
+        else:
+            if (self._is_terminal(s, "red")):
+                losing_penalty = -200
+            
+
+        eval_score = 0.5*(s[2] - s[3]) + 0.2*(dist_from_diag_diff) + winning_reward + losing_penalty
 
         return eval_score
 
@@ -159,8 +168,8 @@ class Player:
         # s[1] += 1
         # print("max", s[1])
         # print("MAX: ############################")
-        if (s[1] >= self.cutoff_depth or (self._is_terminal(s))):
-            return self._get_eval_score(s, a)
+        if (s[1] >= self.cutoff_depth or (self._is_terminal(s, self.colour))):
+            return self._get_eval_score(s, a, self.colour)
 
         max_eval = -inf
         actions = self._get_actions(s, self.colour)
@@ -196,8 +205,8 @@ class Player:
         # s[1] = s[1] + 1
         # print("min", s[1])
         # print("MIN: ############################")
-        if (s[1] >= self.cutoff_depth or (self._is_terminal(s))):
-            return self._get_eval_score(s, a)
+        if (s[1] >= self.cutoff_depth or (self._is_terminal(s, self.opp_colour))):
+            return self._get_eval_score(s, a, self.opp_colour)
 
         min_val = inf
         actions = self._get_actions(s, self.opp_colour)
@@ -222,12 +231,12 @@ class Player:
                 break
         return min_val
 
-    def _is_terminal(self, s):
+    def _is_terminal(self, s, colour):
         """ Do bfs on every starting node of the corresponding colour and check if there is a path to the otherside"""
         # s = [self.internal_board, depth]
         # action = ("PLACE", r, q)
         
-        if self.colour == "red": # red: start is bottom row, goal is top
+        if colour == "red": # red: start is bottom row, goal is top
             starts = [(0,i) for i in range(self.n)]
             goals = [(self.n-1,i) for i in range(self.n)]
         else: # blue: start is left column, goal is right
@@ -236,8 +245,8 @@ class Player:
 
         for i in range(self.n):
             node = starts[i]
-            if s[0][node[0]][node[1]] == self.colour:
-                if (self.dfs(node[0], node[1], goals, s)):
+            if s[0][node[0]][node[1]] == colour:
+                if (self.dfs(node[0], node[1], goals, s, colour)):
                     return True
         return False
 
@@ -256,7 +265,7 @@ class Player:
         return False
 
     
-    def dfs(self, r, q, goals, s):
+    def dfs(self, r, q, goals, s, colour):
         visited = [(r,q)]
         stack = [(r,q)]
         while (stack != []):
@@ -264,19 +273,19 @@ class Player:
             visited.append(curr)
             if curr in goals:
                 return True
-            for neighbour in self.get_neighbours(curr[0], curr[1], s):
+            for neighbour in self.get_neighbours(curr[0], curr[1], s, colour):
                 if neighbour not in visited:
                     stack.append(neighbour)
                     visited.append(neighbour)
         return False
 
 
-    def get_neighbours(self, r, q, s):
+    def get_neighbours(self, r, q, s, colour):
         firsts = [r+1, r-1, r, r, r+1, r-1]
         seconds = [q, q, q+1, q-1, q-1, q+1]
         neighbours = []
         for i in range(len(firsts)):
-            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and s[0][firsts[i]][seconds[i]] == self.colour):
+            if (firsts[i] < self.n and seconds[i] < self.n and firsts[i] >= 0 and seconds[i] >= 0 and s[0][firsts[i]][seconds[i]] == colour):
                 neighbours.append((firsts[i], seconds[i]))
         return neighbours
 

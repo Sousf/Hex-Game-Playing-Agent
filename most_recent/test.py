@@ -1,7 +1,8 @@
 from cmath import inf
 import copy
+from math import floor
 from random import randint
-from numpy import sqrt, zeros, array, roll, vectorize, average, log
+from numpy import cos, sin, sqrt, zeros, array, roll, vectorize, average, log
 
 
 
@@ -28,4 +29,4 @@ import sys
 n = 8
 
 for x in range(1,n**2):
-    print("x: ", x ,"y: ", 1 + log((x)/sqrt(n)))
+    print("x: ", x ,"y: ", floor(2*cos(0.25*x+3)+3))
